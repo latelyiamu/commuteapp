@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Commute Scorer</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f5f5f3;
+    --surface: #ffffff;
+    --border: #e0ddd5;
+    --text: #1a1a18;
+    --muted: #6b6b67;
+    --accent: #2563eb;
+    --accent-bg: #eff6ff;
+    --danger: #dc2626;
+    --success: #16a34a;
+    --warning: #d97706;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+
+  body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); font-size: 15px; line-height: 1.6; min-height: 100vh; }
+
+  .app { max-width: 860px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+
+  h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 0.25rem; }
+  h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; }
+  .subtitle { color: var(--muted); font-size: 0.85rem; margin-bottom: 2rem; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem; box-shadow: var(--shadow); }
+
+  .section-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.75rem; }
+
+  input[type="text"], input[type="number"], select {
+    width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: 7px;
+    font-size: 0.9rem; background: var(--bg); color: var(--text); outline: none;
+    transition: border-color 0.15s;
+  }
+  input:focus, select:focus { border-color: var(--accent); background: #fff; }
+
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 0.45rem 1rem; border-radius: 7px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 0.85rem; cursor: pointer; transition: background 0.12s, border-color 0.12s; white-space: nowrap; }
+  .btn:hover { background: var(--bg); border-color: #bbb; }
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-primary:hover { background: #1d4ed8; border-color: #1d4ed8; }
+  .btn-danger { color: var(--danger); border-color: #fecaca; }
+  .btn-danger:hover { background: #fff5f5; }
+  .btn-sm { padding: 0.3rem 0.65rem; font-size: 0.8rem; }
+
+  .row { display: flex; gap: 0.75rem; align-items: flex-start; margin-bottom: 0.75rem; }
+  .row .grow { flex: 1; min-width: 0; }
+  label { display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 0.25rem; }
+
+  .dest-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 80px 36px; gap: 8px; align-items: flex-end; margin-bottom: 0.5rem; }
+  @media (max-width: 600px) {
+    .dest-grid { grid-template-columns: 1fr 1fr; }
+    .dest-grid .dest-name { grid-column: 1 / -1; }
+    .dest-grid .del-btn { grid-column: 2; justify-self: end; }
+  }
+
+  .travel-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 0.5rem; }
+
+  .score-badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 20px; font-size: 0.78rem; font-weight: 600; }
+  .score-good { background: #dcfce7; color: #15803d; }
+  .score-mid { background: #fef9c3; color: #a16207; }
+  .score-bad { background: #fee2e2; color: #b91c1c; }
+
+  .results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; margin-top: 1rem; }
+
+  .prop-result { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; }
+  .prop-result.best { border-color: var(--accent); background: var(--accent-bg); }
+  .prop-name { font-weight: 600; font-size: 0.95rem; margin-bottom: 0.5rem; word-break: break-word; }
+  .overall-score { font-size: 2rem; font-weight: 700; line-height: 1; }
+  .overall-label { font-size: 0.75rem; color: var(--muted); margin-bottom: 0.75rem; }
+
+  .dest-row { display: flex; justify-content: space-between; align-items: center; padding: 0.35rem 0; border-top: 1px solid var(--border); font-size: 0.82rem; gap: 8px; }
+  .dest-row-name { color: var(--muted); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .bar-wrap { height: 5px; background: var(--border); border-radius: 3px; margin: 0.4rem 0; overflow: hidden; }
+  .bar { height: 100%; border-radius: 3px; transition: width 0.3s; }
+
+  .tabs { display: flex; gap: 4px; margin-bottom: 1.5rem; }
+  .tab { padding: 0.4rem 1rem; border-radius: 7px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); font-size: 0.85rem; cursor: pointer; }
+  .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .empty { text-align: center; color: var(--muted); padding: 2rem; font-size: 0.9rem; }
+  .tag { display: inline-block; font-size: 0.72rem; background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; margin-left: 4px; color: var(--muted); }
+  .best-tag { background: var(--accent-bg); color: var(--accent); border-color: #bfdbfe; }
+
+  .prop-entry { border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 1rem; overflow: hidden; }
+  .prop-header { display: flex; align-items: center; gap: 8px; padding: 0.75rem 1rem; background: var(--surface); cursor: pointer; }
+  .prop-header:hover { background: var(--bg); }
+  .prop-body { padding: 1rem; border-top: 1px solid var(--border); background: var(--surface); }
+  .chevron { transition: transform 0.2s; font-size: 0.75rem; color: var(--muted); }
+  .collapsed .chevron { transform: rotate(-90deg); }
+  .collapsed .prop-body { display: none; }
+
+  .comparison-bar { margin-bottom: 0.75rem; }
+  .cmp-label { display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 3px; }
+  .cmp-track { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+  .cmp-fill { height: 100%; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>Commute Scorer</h1>
+  <p class="subtitle">Compare properties by commute difficulty across destinations</p>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('setup')">Setup</button>
+    <button class="tab" onclick="showTab('results')">Results</button>
+  </div>
+
+  <!-- SETUP TAB -->
+  <div id="tab-setup">
+    <!-- Destinations -->
+    <div class="card">
+      <div class="section-label">Destinations <span id="dest-count" class="tag">0/10</span></div>
+      <div id="dest-list"></div>
+      <button class="btn btn-sm" onclick="addDest()">+ Add destination</button>
+    </div>
+
+    <!-- Properties -->
+    <div class="card">
+      <div class="section-label">Properties</div>
+      <div id="prop-list"></div>
+      <button class="btn btn-sm" onclick="addProp()">+ Add property</button>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:1rem;">
+      <button class="btn btn-primary" onclick="showTab('results')">View results →</button>
+      <button class="btn" onclick="clearAll()" style="color:var(--danger);">Clear all</button>
+    </div>
+  </div>
+
+  <!-- RESULTS TAB -->
+  <div id="tab-results" style="display:none;">
+    <div id="results-content"></div>
+  </div>
+</div>
+
+<script>
+// State
+let state = { destinations: [], properties: [] };
+
+function save() { try { localStorage.setItem('cs_v1', JSON.stringify(state)); } catch(e){} }
+function load() { try { const d = localStorage.getItem('cs_v1'); if(d) state = JSON.parse(d); } catch(e){} }
+
+load();
+
+// Score: time 60%, transfers 25%, walking 15%
+// Normalise: time/120, transfers/5, walking/60 → clamp 0-1
+function calcScore(time, transfers, walk) {
+  if (time === null && transfers === null && walk === null) return null;
+  const t = Math.min((time||0)/120, 1);
+  const tr = Math.min((transfers||0)/5, 1);
+  const w = Math.min((walk||0)/60, 1);
+  return Math.round((t*0.6 + tr*0.25 + w*0.15) * 100);
+}
+
+function scoreColor(s) {
+  if (s === null) return 'var(--muted)';
+  if (s <= 35) return '#16a34a';
+  if (s <= 65) return '#d97706';
+  return '#dc2626';
+}
+
+function scoreBadgeClass(s) {
+  if (s === null) return '';
+  if (s <= 35) return 'score-good';
+  if (s <= 65) return 'score-mid';
+  return 'score-bad';
+}
+
+// ---------- DESTINATIONS ----------
+function addDest() {
+  if (state.destinations.length >= 10) return alert('Maximum 10 destinations.');
+  state.destinations.push({ id: Date.now(), name: '', priority: 3 });
+  save(); renderDests();
+}
+
+function removeDest(id) {
+  state.destinations = state.destinations.filter(d => d.id !== id);
+  state.properties.forEach(p => { delete p.commutes[id]; });
+  save(); renderDests(); renderProps();
+}
+
+function updateDest(id, field, val) {
+  const d = state.destinations.find(d => d.id === id);
+  if (d) { d[field] = val; save(); }
+  if (field === 'name') renderProps();
+}
+
+function renderDests() {
+  const el = document.getElementById('dest-list');
+  document.getElementById('dest-count').textContent = state.destinations.length + '/10';
+  if (!state.destinations.length) { el.innerHTML = '<p class="empty" style="padding:1rem 0;">No destinations yet.</p>'; return; }
+  el.innerHTML = state.destinations.map(d => `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:0.75rem;margin-bottom:0.75rem;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div>
+          <label>Destination name</label>
+          <input type="text" value="${esc(d.name)}" placeholder="e.g. Office, Gym" onchange="updateDest(${d.id},'name',this.value)">
+        </div>
+        <div>
+          <label>Priority (1–5)</label>
+          <select onchange="updateDest(${d.id},'priority',+this.value)">
+            ${[1,2,3,4,5].map(n=>`<option value="${n}" ${d.priority===n?'selected':''}>${n}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:flex-end;">
+        <div style="flex:1;">
+          <label>Address</label>
+          <input type="text" value="${esc(d.address||'')}" placeholder="e.g. 1 Canada Square, London" onchange="updateDest(${d.id},'address',this.value)">
+        </div>
+        <button class="btn btn-sm btn-danger" onclick="removeDest(${d.id})">✕ Remove</button>
+      </div>
+    </div>`).join('');
+}
+
+// ---------- PROPERTIES ----------
+function addProp() {
+  const commutes = {};
+  state.destinations.forEach(d => { commutes[d.id] = { time: null, transfers: null, walk: null }; });
+  state.properties.push({ id: Date.now(), address: '', commutes });
+  save(); renderProps();
+}
+
+function removeProp(id) {
+  state.properties = state.properties.filter(p => p.id !== id);
+  save(); renderProps();
+}
+
+function updateProp(id, field, val) {
+  const p = state.properties.find(p => p.id === id);
+  if (p) { p[field] = val; save(); }
+}
+
+function updateCommute(pid, did, field, val) {
+  const p = state.properties.find(p => p.id === pid);
+  if (!p) return;
+  if (!p.commutes[did]) p.commutes[did] = {};
+  p.commutes[did][field] = val === '' ? null : +val;
+  save();
+}
+
+function toggleProp(id) {
+  const el = document.getElementById('prop-' + id);
+  el.classList.toggle('collapsed');
+}
+
+function renderProps() {
+  const el = document.getElementById('prop-list');
+  if (!state.properties.length) { el.innerHTML = '<p class="empty" style="padding:1rem 0;">No properties yet.</p>'; return; }
+  el.innerHTML = state.properties.map(p => {
+    const destRows = state.destinations.map(d => {
+      const c = p.commutes[d.id] || {};
+      return `
+      <div style="margin-bottom:10px;">
+        <div style="font-size:0.8rem;font-weight:600;margin-bottom:6px;color:var(--muted);">${esc(d.name)||'(unnamed)'} <span class="tag">Priority ${d.priority}</span></div>
+        ${d.address ? `<div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;opacity:0.7;">${esc(d.address)}</div>` : ''}        <div class="travel-grid">
+          <div><label>Travel time (min)</label><input type="number" min="0" placeholder="e.g. 30" value="${c.time??''}" onchange="updateCommute(${p.id},${d.id},'time',this.value)"></div>
+          <div><label>Transfers</label><input type="number" min="0" placeholder="e.g. 1" value="${c.transfers??''}" onchange="updateCommute(${p.id},${d.id},'transfers',this.value)"></div>
+          <div><label>Walking (min)</label><input type="number" min="0" placeholder="e.g. 10" value="${c.walk??''}" onchange="updateCommute(${p.id},${d.id},'walk',this.value)"></div>
+        </div>
+      </div>`;
+    }).join('');
+    return `
+    <div class="prop-entry" id="prop-${p.id}">
+      <div class="prop-header" onclick="toggleProp(${p.id})">
+        <span style="flex:1;font-size:0.92rem;font-weight:500;">${esc(p.address)||'(no address)'}</span>
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();removeProp(${p.id})">Remove</button>
+        <span class="chevron">▾</span>
+      </div>
+      <div class="prop-body">
+        <div style="margin-bottom:1rem;">
+          <label>Property address</label>
+          <input type="text" value="${esc(p.address)}" placeholder="e.g. 14 Baker Street, London" onchange="updateProp(${p.id},'address',this.value)">
+        </div>
+        ${state.destinations.length ? destRows : '<p style="color:var(--muted);font-size:0.85rem;">Add destinations first to enter commute data.</p>'}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ---------- RESULTS ----------
+function calcPropScore(p) {
+  if (!state.destinations.length) return null;
+  let totalWeight = 0, weightedSum = 0;
+  state.destinations.forEach(d => {
+    const c = p.commutes[d.id] || {};
+    if (c.time === null && c.transfers === null && c.walk === null) return;
+    const s = calcScore(c.time, c.transfers, c.walk);
+    if (s === null) return;
+    weightedSum += s * d.priority;
+    totalWeight += d.priority;
+  });
+  return totalWeight ? Math.round(weightedSum / totalWeight) : null;
+}
+
+function renderResults() {
+  const el = document.getElementById('results-content');
+  if (!state.properties.length || !state.destinations.length) {
+    el.innerHTML = '<div class="empty">Add at least one property and one destination to see results.</div>';
+    return;
+  }
+
+  const scores = state.properties.map(p => ({ p, score: calcPropScore(p) }));
+  const validScores = scores.filter(x => x.score !== null).map(x => x.score);
+  const best = validScores.length ? Math.min(...validScores) : null;
+
+  // Comparison bars
+  let cmpHtml = '';
+  if (validScores.length > 1) {
+    const maxS = Math.max(...validScores) || 100;
+    cmpHtml = `<div class="card"><div class="section-label">Property comparison (lower = easier commute)</div>` +
+      scores.filter(x => x.score !== null).map(({p, score}) => `
+        <div class="comparison-bar">
+          <div class="cmp-label">
+            <span>${esc(p.address)||'(no address)'}</span>
+            <span style="font-weight:600;color:${scoreColor(score)}">${score}</span>
+          </div>
+          <div class="cmp-track">
+            <div class="cmp-fill" style="width:${Math.round(score/maxS*100)}%;background:${scoreColor(score)};"></div>
+          </div>
+        </div>`).join('') + '</div>';
+  }
+
+  // Per-property cards
+  const cards = scores.map(({p, score}) => {
+    const isBest = score !== null && score === best && validScores.length > 1;
+    const destBreakdown = state.destinations.map(d => {
+      const c = p.commutes[d.id] || {};
+      const s = calcScore(c.time, c.transfers, c.walk);
+      return `<div class="dest-row">
+        <span class="dest-row-name">${esc(d.name)||'(unnamed)'}</span>
+        ${s !== null ? `<span class="score-badge ${scoreBadgeClass(s)}">${s}</span>` : '<span style="color:var(--muted);font-size:0.78rem;">—</span>'}
+      </div>`;
+    }).join('');
+
+    return `<div class="prop-result ${isBest?'best':''}">
+      ${isBest ? '<div style="font-size:0.72rem;font-weight:600;color:var(--accent);margin-bottom:4px;">★ Best overall</div>' : ''}
+      <div class="prop-name">${esc(p.address)||'(no address)'}</div>
+      ${score !== null
+        ? `<div class="overall-score" style="color:${scoreColor(score)}">${score}</div>
+           <div class="overall-label">overall difficulty (0–100)</div>`
+        : '<div class="overall-label" style="margin-top:4px;">No data entered yet</div>'}
+      ${destBreakdown}
+    </div>`;
+  }).join('');
+
+  el.innerHTML = cmpHtml + '<div class="results-grid">' + cards + '</div>' +
+    `<p style="font-size:0.75rem;color:var(--muted);margin-top:1.5rem;">Score formula: travel time 60% · transfers 25% · walking 15% · weighted by destination priority</p>`;
+}
+
+// ---------- TABS ----------
+function showTab(name) {
+  document.getElementById('tab-setup').style.display = name === 'setup' ? '' : 'none';
+  document.getElementById('tab-results').style.display = name === 'results' ? '' : 'none';
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (i===0) === (name==='setup')));
+  if (name === 'results') renderResults();
+}
+
+function clearAll() {
+  if (!confirm('Clear all data?')) return;
+  state = { destinations: [], properties: [] };
+  save(); renderDests(); renderProps();
+}
+
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Init
+renderDests();
+renderProps();
+</script>
+</body>
+</html>
